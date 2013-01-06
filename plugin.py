@@ -1,4 +1,5 @@
 ###
+# coding=UTF-8
 # Copyright (c) 2012, Ashley Davis
 # All rights reserved.
 #
@@ -43,12 +44,15 @@ class RPGDice(callbacks.Plugin):
     
     # Some utility functions
     def rollDice(self, sides, num):
-        arr=[]
-        for _ in repeat(None, num):
-            x = randint(1,10)
-            arr+=[x]
-        arr.sort() # in-place
-        return arr
+        if num>1:
+            ret=[]
+            for _ in repeat(None, num):
+                x = randint(1,sides+1)
+                ret+=[x]
+            ret.sort() # in-place
+        else:
+            ret = randint(1,sides+1)
+        return ret
     
     def matchORE(self, arr):
         str=""
@@ -66,17 +70,43 @@ class RPGDice(callbacks.Plugin):
                 y+=arr.count(x)
         return y
 
-    def dh(self,irc,msg,args,diff,type,note):
-        """ <difficulty> [<type>] [<note>] --
+    def optTxt(self,num,pre="",post=""):
+        txt=""
+        if num:
+            if pre: txt+="%s"%pre
+            txt+="%s"%num
+            if post: txt+="%s"%post
+        return txt
+
+    def dh(self,irc,msg,args,mod,kind,note):
+        """ <modifier> [<kind>] [<note>] --
         -- Rolls a d100 and returns the result, and whether or not the roll
         was successful."""
         ##TODO: error checking will go here
+        if mod > 1000 or mod < 1:
+            irc.error("Is that really necessary?")
+            return
 
-        ##TODO: everything
+        #roll and define success or fail.
         roll=self.rollDice(100,1)
-        if roll <= diff:
-            success=True
-            degrees=(diff-roll)/10
+        reply=""
+        if roll <= mod:
+            degrees=(mod-roll)/10
+            reply+="a successful hit%s!"%self.optTxt(degrees,pre=" by ",post="°")
+        else:
+            degrees=(roll-mod)/10
+            reply+="a miss%s"%self.optTxt(degrees,pre=" by ",post="°")
+        reply+=" [%s]"%roll
+
+        if kind:
+            reply+=" {DEBUG: kind: %s}"%kind
+
+        #final reply
+        irc.reply("%s: %s"%(msg.nick,reply))
+    dh = wrap(dh, ['int',
+                    optional('somethingWithoutSpaces'),
+                    optional('text')
+                ])
 
     def owod(self,irc,msg,args,pool,diff,note):
         """ <number of dice> [<difficulty=6>] [<note>] 
