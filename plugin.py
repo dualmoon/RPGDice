@@ -73,6 +73,10 @@ class RPGDice(callbacks.Plugin):
         ##TODO: error checking will go here
 
         ##TODO: everything
+        roll=self.rollDice(100,1)
+        if roll <= diff:
+            success=True
+            degrees=(diff-roll)/10
 
     def owod(self,irc,msg,args,pool,diff,note):
         """ <number of dice> [<difficulty=6>] [<note>] 
