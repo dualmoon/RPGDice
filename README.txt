@@ -1,0 +1,1 @@
+This plugin allows the rolling of dice specifically for a variety of RPGs.
