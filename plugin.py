@@ -35,7 +35,7 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-import supybot.log as log
+from supybot.log import *
 from random import randint
 from itertools import repeat
 import re,string
@@ -169,6 +169,23 @@ class RPGDice(callbacks.Plugin):
                 break
         return hits
 
+    def isValidKind(self,kind):
+        '''Checks to see if {str} is a valid attack kind.'''
+        log.INFO('Checking kind: "%s".'%kind)
+        if self.isValidRanged(kind) or self.isValidMelee(kind):
+            return True
+        else: return False
+
+    def isValidRanged(self,kind):
+        '''Checks to see if {kind} is a valid ranged attack kind.'''
+        rangedList=("auto","semi")
+        return kind in rangedList
+
+    def isValidMelee(self,kind):
+        '''Checks to see if {kind} is a valid melee attack kind.'''
+        meleeList=()
+        return kind in meleeList        
+
     ####
     ## Commands
     ####
@@ -180,6 +197,15 @@ class RPGDice(callbacks.Plugin):
         -- Rolls a d100 and returns the result, and whether or not the roll
         was successful. You may optionally add a note."""
         
+        ##TODO: parse {rest} to find {kind} and {note}
+        #if rest:
+        #    restSplit=rest.split(' ')
+        #    if isValidKind(restSplit[0]):
+        #        kind=restSplit[0]
+        #        note=' '.join(restSplit[1:])
+        #    else:
+        #        note=rest
+
         ##TODO: error checking will go here
         if test > 300 or test < 1:
             irc.error("You must roll a difficulty between ")
@@ -190,15 +216,9 @@ class RPGDice(callbacks.Plugin):
         #initialize our reply string
         reply=""
 
-        ##TODO: change this to a literals wrap!
-        #temp: keep a list of valid attack kinds.
-        rangedList=("auto","semi")
-        meleeList=()
-        kindList=rangedList+meleeList
-
         #first we check if the attack was ranged,
         #and if so whether or not the weapon jams.
-        if roll >= 96 and kind in rangedList:
+        if roll >= 96 and self.isValidRanged(kind):
             reply="your weapon jams! (reroll if using unjammable weapon)"
         #check if the roll was a critfail.
         elif roll == 100:
@@ -219,7 +239,7 @@ class RPGDice(callbacks.Plugin):
         reply+=" [%s]"%roll
 
         #check if an attack kind was specified and valid
-        if kind in kindList:
+        if kind:
             #make sure the combat hit was successful
             if "success" in reply:
                 #change reply to reflect combat mode
@@ -243,11 +263,12 @@ class RPGDice(callbacks.Plugin):
                     #add the hits to our reply string
                     reply+=" (%s)"%hits
 
+        #if there is a note, we will add it here
+        if note: reply+=" (%s)"%note
         #send the finalized reply
         irc.reply("%s: %s"%(msg.nick,reply))
     dh = wrap(dh, ['int',
-                    ##TODO: make this literals
-                    optional('somethingWithoutSpaces'),
+                    optional( ('somethingWithoutSpaces',isValidKind) ),
                     optional('text')
                 ])
 
