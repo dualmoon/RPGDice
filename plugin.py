@@ -1,6 +1,7 @@
 ###
 # coding=UTF-8
-# Copyright (c) 2012, Ashley Davis
+# Copyright (c) 2013, Ashley Davis (ashley@airsi.de)
+# http://kittyanarchy.net/ http://airsi.de/
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,43 +35,46 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
+import supybot.log as log
 from random import randint
 from itertools import repeat
 import re,string
 
 class RPGDice(callbacks.Plugin):
     """A plugin that rolls various dice sets for pen-and-pad roleplaying 
-    games. Has two commands: 'ore,' and 'owod'"""
+    games. Has three commands: 'ore' for one-roll engine, 'owod' for old
+    World of Darkness, and 'dh' for Dark Heresy."""
     
-    # Some utility functions
+    ####
+    ## Some utility functions
+    ####
     def rollDice(self, sides, num):
+        '''Rolls {num} dice of {sides} sides.'''
+        #make sure we need to roll multiple dice
         if num>1:
+            #initialize the list that will hold the rolled dice
             ret=[]
+            #iterate without bothering to hold the iterator's current value
             for _ in repeat(None, num):
+                #roll the die
                 x = randint(1,sides+1)
+                #add the die to the list
                 ret+=[x]
+            #sort the list from low to high, prettier
             ret.sort() # in-place
+        #roll just one die
         else:
+            #roll the die
             ret = randint(1,sides+1)
         return ret
-    
-    def matchORE(self, arr):
-        str=""
-        for x in xrange(1,11):
-            y = arr.count(x)
-            if y>1:
-                str+="%sx%s, "%(y,x)
-        if str: str=str[0:-2]
-        return str
 
-    def matchOWOD(self,arr,diff):
-        y=0
-        for x in xrange(diff,11):
-            if arr.count(x):
-                y+=arr.count(x)
-        return y
+    def insert(self, src, new, pos):
+        '''Inserts new inside src at pos.'''
+        return src[:pos] + new + src[pos:]
 
     def optTxt(self,num,pre="",post=""):
+        '''Returns a number if it exists, with optional pre- and post- text
+        formatting.'''
         txt=""
         if num:
             if pre: txt+="%s"%pre
@@ -78,36 +82,177 @@ class RPGDice(callbacks.Plugin):
             if post: txt+="%s"%post
         return txt
 
-    def dh(self,irc,msg,args,mod,kind,note):
-        """ <modifier> [<kind>] [<note>] --
+    ####
+    ## Engine-specific functions
+    ####
+    #one-roll engine helper function(s)
+    def matchORE(self, arr):
+        '''Finds and returns the number of ORE-style matches in {arr}.'''
+        #initialize our string
+        ret=""
+        #check matches for each number 1-10
+        for x in xrange(1,11):
+            #count how many times {x} is found
+            y = arr.count(x)
+            #if {x} is found more than once...
+            if arr.count(x)>1:
+                #add how many times we found {x} to our list formatted
+                ret+="%sx%s, "%(y,x)
+        #trim off the trailing comma
+        if ret: ret=ret[0:-2]
+        return ret
+
+    #old world of darkness helper function(s)
+    def matchOWOD(self,arr,diff):
+        '''Finds and returns the number of times a die >= {diff} is found
+        in {arr}.'''
+        #initialize our counter
+        y=0
+        #check each die side from our difficulty to a max of 10
+        for x in xrange(diff,11):
+            #if we found at least one match...
+            if arr.count(x):
+                #...add how many times we found that die side
+                y+=arr.count(x)
+        return y
+
+    #dark heresy helper function(s)
+    def matchDH(self,roll):
+        '''Matches percentile rolls to their corresponding hit box, and
+        returns the box that was hit.'''
+        #reverse the number rolled as a string,
+        #then force it back to int
+        hit=int(str(roll)[::-1])
+        #find where the hit landed
+        if hit <= 10:
+            return "Head"
+        elif hit <= 20:
+            return "Right Arm"
+        elif hit <=30:
+            return "Left Arm"
+        elif hit <=70:
+            return "Body"
+        elif hit <=85:
+            return "Right Leg"
+        elif hit <=100:
+            return "Left Leg"
+
+    def nextHit(self,hit,deg):
+        '''Calculates where additional hits past the second land according
+        to the official hit table.'''
+        #initialize our string to return
+        hits=""
+        #how many hits to calculate
+        #degrees minus the two already determined.
+        calcs=deg-2
+
+        #hit tables
+        if "Head" in hit: hitList=("Arm","Body","Arm","Body")
+        elif "Arm" in hit: hitList=("Body","Head","Body","Arm")
+        elif "Body" in hit: hitList=("Arm","Head","Arm","Body")
+        elif "Leg" in hit: hitList=("Body","Arm","Head","Body")          
+
+        #calculate each hit, but use indicies for our hitlists.
+        #calcs will be at least 0, so need to add 1
+        for x in xrange(0,calcs+1):
+            #third, fourth, fifth hits as indicies.
+            if x < 3: 
+                hits+=", %s"%hitList[x]
+            #sixth hit, no further hits
+            elif x==calcs==3:
+                hits+=", %s"%hitList[3]
+            #sixth hit, more hits.
+            else:
+                #calc as fourth hit in table, index 3
+                hits+=", %sx%s"%(hitList[3],calcs-2)
+                #break so further hits aren't calculated.
+                break
+        return hits
+
+    ####
+    ## Commands
+    ####
+
+    ## Dark Heresy
+    # 'dh'
+    def dh(self,irc,msg,args,test,kind,note):
+        """ <test> [<kind>] [<note>]
         -- Rolls a d100 and returns the result, and whether or not the roll
-        was successful."""
+        was successful. You may optionally add a note."""
+        
         ##TODO: error checking will go here
-        if mod > 1000 or mod < 1:
-            irc.error("Is that really necessary?")
+        if test > 300 or test < 1:
+            irc.error("You must roll a difficulty between ")
             return
 
-        #roll and define success or fail.
+        #roll against a d%
         roll=self.rollDice(100,1)
+        #initialize our reply string
         reply=""
-        if roll <= mod:
-            degrees=(mod-roll)/10
-            reply+="a successful hit%s!"%self.optTxt(degrees,pre=" by ",post="°")
+
+        ##TODO: change this to a literals wrap!
+        #temp: keep a list of valid attack kinds.
+        rangedList=("auto","semi")
+        meleeList=()
+        kindList=rangedList+meleeList
+
+        #first we check if the attack was ranged,
+        #and if so whether or not the weapon jams.
+        if roll >= 96 and kind in rangedList:
+            reply="your weapon jams! (reroll if using unjammable weapon)"
+        #check if the roll was a critfail.
+        elif roll == 100:
+            reply="a critical failure!"
+        #finally we check if the roll was successful (roll<=test)
+        elif roll <= test:
+            #calculate degrees of success
+            degrees=(test-roll)/10
+            #add formatted success message to our reply string
+            reply+="a success%s!"%self.optTxt(degrees,pre=" by ",post="°")
+        #if we didn't succeed, jam, or critfail then we were unsuccessful
         else:
-            degrees=(roll-mod)/10
-            reply+="a miss%s"%self.optTxt(degrees,pre=" by ",post="°")
+            #calculate degrees of success
+            degrees=(roll-test)/10
+            #add formatted failure message to our reply string
+            reply+="unsuccessful%s."%self.optTxt(degrees,pre=" by ",post="°")
+        #add the actual roll to our reply.
         reply+=" [%s]"%roll
 
-        if kind:
-            reply+=" {DEBUG: kind: %s}"%kind
+        #check if an attack kind was specified and valid
+        if kind in kindList:
+            #make sure the combat hit was successful
+            if "success" in reply:
+                #change reply to reflect combat mode
+                reply=self.insert(reply,"ful hit",9)
+                #ranged weapon firing mode
+                if kind=="auto" or kind=="semi":
+                    #in semi mode, need two degrees per extra hit
+                    if kind=="semi": degrees=degrees/2
+                    #{hits} holds our hit location string
+                    #{first} holds the primary target determined by roll
+                    first=hits=self.matchDH(roll)
+                    #if we have any degrees, determine additional hits
+                    if degrees:
+                        #second hit always matches the first.
+                        hits+=", %s"%hits
+                        #third hit onward is determined with nextHit()
+                        if degrees>1:
+                            #we will pass the first hit and the number of
+                            #degrees to calculate. this number will be 2+
+                            hits+=self.nextHit(first,degrees)
+                    #add the hits to our reply string
+                    reply+=" (%s)"%hits
 
-        #final reply
+        #send the finalized reply
         irc.reply("%s: %s"%(msg.nick,reply))
     dh = wrap(dh, ['int',
+                    ##TODO: make this literals
                     optional('somethingWithoutSpaces'),
                     optional('text')
                 ])
 
+    ## Old World of Darkness
+    # owod
     def owod(self,irc,msg,args,pool,diff,note):
         """ <number of dice> [<difficulty=6>] [<note>] 
         -- Rolls d10's and returns the results, and whether or not the roll
