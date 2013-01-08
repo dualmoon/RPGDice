@@ -35,7 +35,6 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-from supybot.log import *
 from random import randint
 from itertools import repeat
 import re,string
@@ -227,7 +226,6 @@ class RPGDice(callbacks.Plugin):
         #first we check if the attack was ranged,
         #and if so whether or not the weapon jams.
         if roll >= 96 and self.isValidRanged(kind):
-            print "DEBUG  In weapon jam clause, kind: %s, type: %s"%(kind,type(kind))
             reply="your weapon jams! (reroll if using unjammable weapon)"
         #check if the roll was a critfail.
         elif roll == 100:
