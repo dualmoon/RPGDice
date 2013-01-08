@@ -57,7 +57,7 @@ class RPGDice(callbacks.Plugin):
             #iterate without bothering to hold the iterator's current value
             for _ in repeat(None, num):
                 #roll the die
-                x = randint(1,sides+1)
+                x = randint(1,sides)
                 #add the die to the list
                 ret+=[x]
             #sort the list from low to high, prettier
@@ -65,7 +65,7 @@ class RPGDice(callbacks.Plugin):
         #roll just one die
         else:
             #roll the die
-            ret = randint(1,sides+1)
+            ret = [randint(1,sides),]
         return ret
 
     def insert(self, src, new, pos):
@@ -81,6 +81,10 @@ class RPGDice(callbacks.Plugin):
             txt+="%s"%num
             if post: txt+="%s"%post
         return txt
+
+    def sRep(self,arr):
+        '''Returns the list or tuple as a comma delimited string.'''
+        return ', '.join(str(x) for x in arr)
 
     ####
     ## Engine-specific functions
@@ -108,6 +112,11 @@ class RPGDice(callbacks.Plugin):
         in {arr}.'''
         #initialize our counter
         y=0
+        #if there's only one number, rather than a list...
+        if type(arr) is int:
+            #...then we just need to check if that one is a hit.
+            if arr >= diff: return 1
+            else: return 0
         #check each die side from our difficulty to a max of 10
         for x in xrange(diff,11):
             #if we found at least one match...
@@ -171,7 +180,6 @@ class RPGDice(callbacks.Plugin):
 
     def isValidKind(self,kind):
         '''Checks to see if {str} is a valid attack kind.'''
-        log.INFO('Checking kind: "%s".'%kind)
         if self.isValidRanged(kind) or self.isValidMelee(kind):
             return True
         else: return False
@@ -192,19 +200,19 @@ class RPGDice(callbacks.Plugin):
 
     ## Dark Heresy
     # 'dh'
-    def dh(self,irc,msg,args,test,kind,note):
+    def dh(self,irc,msg,args,test,rest):
         """ <test> [<kind>] [<note>]
         -- Rolls a d100 and returns the result, and whether or not the roll
         was successful. You may optionally add a note."""
-        
+        kind=None
         ##TODO: parse {rest} to find {kind} and {note}
-        #if rest:
-        #    restSplit=rest.split(' ')
-        #    if isValidKind(restSplit[0]):
-        #        kind=restSplit[0]
-        #        note=' '.join(restSplit[1:])
-        #    else:
-        #        note=rest
+        if rest:
+            restSplit=rest.split(' ')
+            if self.isValidKind(restSplit[0]):
+                kind=restSplit[0]
+                note=' '.join(restSplit[1:])
+            else:
+                note=rest
 
         ##TODO: error checking will go here
         if test > 300 or test < 1:
@@ -212,13 +220,14 @@ class RPGDice(callbacks.Plugin):
             return
 
         #roll against a d%
-        roll=self.rollDice(100,1)
+        roll=self.rollDice(100,1)[0]
         #initialize our reply string
         reply=""
 
         #first we check if the attack was ranged,
         #and if so whether or not the weapon jams.
         if roll >= 96 and self.isValidRanged(kind):
+            print "DEBUG  In weapon jam clause, kind: %s, type: %s"%(kind,type(kind))
             reply="your weapon jams! (reroll if using unjammable weapon)"
         #check if the roll was a critfail.
         elif roll == 100:
@@ -241,7 +250,7 @@ class RPGDice(callbacks.Plugin):
         #check if an attack kind was specified and valid
         if kind:
             #make sure the combat hit was successful
-            if "success" in reply:
+            if "unsuccess" not in reply:
                 #change reply to reflect combat mode
                 reply=self.insert(reply,"ful hit",9)
                 #ranged weapon firing mode
@@ -268,7 +277,6 @@ class RPGDice(callbacks.Plugin):
         #send the finalized reply
         irc.reply("%s: %s"%(msg.nick,reply))
     dh = wrap(dh, ['int',
-                    optional( ('somethingWithoutSpaces',isValidKind) ),
                     optional('text')
                 ])
 
@@ -287,8 +295,9 @@ class RPGDice(callbacks.Plugin):
             irc.error("You must roll between 1 and 20 dice.")
         else:
             if diff == 1:
-                if pool > 1: times=" %s times"%pool
-                reply="Somehow, against all odds, in a true show of epic talent, you manage to succeed%s."%times
+                if pool > 1: times=pool
+                else: times=""
+                reply="Somehow, against all odds, in a true show of epic talent, you manage to succeed%s."%self.optTxt(times," "," times")
                 action=False
             elif diff > 10:
                 reply="You fail. Probably because you're too stupid to even know how many sides a d10 has."
@@ -306,7 +315,7 @@ class RPGDice(callbacks.Plugin):
                     result="botch!"
                 else:
                     result="failure"
-                reply="rolls %s"%str(rolls)[1:-1]
+                reply="rolls %s"%self.sRep(rolls)
                 if note:
                     reply+=" to %s."%note
                 reply+=" (%s)"%result
