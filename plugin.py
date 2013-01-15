@@ -216,7 +216,7 @@ class RPGDice(callbacks.Plugin):
 
         ##TODO: error checking will go here
         if test > 300 or test < 1:
-            irc.error("You must roll a difficulty between ")
+            irc.error("You must roll a difficulty between 1 and 300")
             return
 
         #roll against a d%
