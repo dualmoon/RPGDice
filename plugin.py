@@ -40,10 +40,10 @@ from itertools import repeat
 import re,string
 
 class RPGDice(callbacks.Plugin):
-    """A plugin that rolls various dice sets for pen-and-pad roleplaying 
+    """A plugin that rolls various dice sets for pen-and-pad roleplaying
     games. Has three commands: 'ore' for one-roll engine, 'owod' for old
     World of Darkness, and 'dh' for Dark Heresy."""
-    
+
     ####
     ## Some utility functions
     ####
@@ -158,13 +158,13 @@ class RPGDice(callbacks.Plugin):
         if "Head" in hit: hitList=("Arm","Body","Arm","Body")
         elif "Arm" in hit: hitList=("Body","Head","Body","Arm")
         elif "Body" in hit: hitList=("Arm","Head","Arm","Body")
-        elif "Leg" in hit: hitList=("Body","Arm","Head","Body")          
+        elif "Leg" in hit: hitList=("Body","Arm","Head","Body")
 
         #calculate each hit, but use indicies for our hitlists.
         #calcs will be at least 0, so need to add 1
         for x in xrange(0,calcs+1):
             #third, fourth, fifth hits as indicies.
-            if x < 3: 
+            if x < 3:
                 hits+=", %s"%hitList[x]
             #sixth hit, no further hits
             elif x==calcs==3:
@@ -191,7 +191,7 @@ class RPGDice(callbacks.Plugin):
     def isValidMelee(self,kind):
         '''Checks to see if {kind} is a valid melee attack kind.'''
         meleeList=()
-        return kind in meleeList        
+        return kind in meleeList
 
     ####
     ## Commands
@@ -204,6 +204,7 @@ class RPGDice(callbacks.Plugin):
         -- Rolls a d100 and returns the result, and whether or not the roll
         was successful. You may optionally add a note."""
         kind=None
+        note=False
         ##TODO: parse {rest} to find {kind} and {note}
         if rest:
             restSplit=rest.split(' ')
@@ -281,7 +282,7 @@ class RPGDice(callbacks.Plugin):
     ## Old World of Darkness
     # owod
     def owod(self,irc,msg,args,pool,diff,note):
-        """ <number of dice> [<difficulty=6>] [<note>] 
+        """ <number of dice> [<difficulty=6>] [<note>]
         -- Rolls d10's and returns the results, and whether or not the roll
          was successful. Can add a note optionally after your dice."""
         ##(user) rolls (rolls) to (note). (N successes|failure|botch!)
@@ -325,8 +326,8 @@ class RPGDice(callbacks.Plugin):
                     ])
 
     def ore(self,irc,msg,args,num,call,expert,text):
-        """ <number of dice> [<called>] [<expert>] [<note>]  
-        --  Rolls d10's and returns the results, including any pairs. 
+        """ <number of dice> [<called>] [<expert>] [<note>]
+        --  Rolls d10's and returns the results, including any pairs.
         Can add a note optionally after your dice. """
         if (num > 10) or (num < 1):
             irc.error("You must roll between 1 and 10 dice.")
