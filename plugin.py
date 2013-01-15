@@ -261,11 +261,11 @@ class RPGDice(callbacks.Plugin):
                     first=hits=self.matchDH(roll)
                     #if we have any degrees, determine additional hits
                     if degrees:
-                        if degrees==1:
+                        if degrees==2:
                             #second hit always matches the first.
                             hits+=", %s"%hits
                         #third hit onward is determined with nextHit()
-                        if degrees>1:
+                        if degrees>2:
                             #we will pass the first hit and the number of
                             #degrees to calculate. this number will be 2+
                             hits+=self.nextHit(first,degrees)
